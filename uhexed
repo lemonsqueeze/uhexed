@@ -34,18 +34,27 @@ sub to_jap
 {
     my ($s) = @_;
     $s = Encode::decode("cp932", $s );    
-    $s =~ s/[\t\n\r\0]/./g;
-    return $s;
+
+    # $s =~ s/[\t\n\r\0]/./g;
+
+    my @a = split("", $s);
+    for (my $i = 0; $i < @a; $i++)
+    {
+	if (ord($a[$i]) < 32)
+	{  $a[$i] = "."; }
+    }	    
+
+    return join("", @a);
 }
 
 $width = 28;
 $lines = 25;
 sub print_page
 {
-    printf("\n\n\n\n\n");
+    printf("\n\n\n\n\n\n");
     for (my $i = 0; $i < $lines; $i++)
     {
-	printf("%05x ", $top + $i*$width);
+	printf("%08x ", $top + $i*$width);
 
 	# Regular hex dump
 	for (my $j = 0; $j < $width; $j++)
@@ -161,11 +170,15 @@ while (1)
     {  $cur--; check_up();    }
     if ($key eq "up")
     {  $cur -= $width;  check_up();    }
+    if ($key eq "pgup")
+    {  $cur -= $lines * $width;  check_up();    }
 
     if ($key eq "right")
     {  $cur++;  check_down(); }
     if ($key eq "down")
     {  $cur += $width;  check_down(); }
+    if ($key eq "pgdn")
+    {  $cur += $lines * $width;  check_down();    }
 
     print_page();
 }
