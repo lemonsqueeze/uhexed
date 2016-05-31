@@ -121,12 +121,22 @@ sub print_page
 
 sub read_line
 {
+    my ($prompt) = @_;
+    print "$prompt";  STDOUT->flush();
     my $s = "";
     while (1)
     {
 	my $key = readkey();
 	if ($key eq "\n")
 	{  return $s;  }
+	if (ord($key) == 0x7f)  # Backspace
+	{ 
+	   my $s2 = $s;  $s2 =~ s/./ /g;
+	   print "\r$prompt$s2"; STDOUT->flush();
+	   $s = substr($s, 0, length($s)-1); 
+	   print "\r$prompt$s"; STDOUT->flush(); 
+	   next;
+	}
 
 	print "$key";  STDOUT->flush();	
 	$s .= $key;
@@ -233,7 +243,7 @@ while (1)
 {
     my $key = read_key();
 #    print "\n";
-#    printf("key: %s\n", $key);
+#    printf("key: '%s' 0x%02x\n", $key, ord($key));
 
     if ($key eq "left")
     {  $cur--; check_up();    }
@@ -258,11 +268,14 @@ while (1)
 	read_file();
     }
 
-
     if ($key eq "/")
     {  
-	print "/";  STDOUT->flush();
-	search_forward(read_line()); 
+	search_forward(read_line("/")); 
+    }
+
+    if ($key eq "w")
+    {  
+	#search_forward(read_line("write: ")); 
     }
 
     print_page();
