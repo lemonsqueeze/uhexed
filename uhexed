@@ -10,17 +10,29 @@ binmode STDOUT, ":utf8";
 my $file = $ARGV[0];
 
 open(IN, "< $file") || die "couldn't open $file";
-#binmode $fh, ':binary';
+#binmode IN, ':binary';
+
 
 #@array = <IN>;
 
 # Buffer size
-my $bsize = 8192;
+my $bsize = 100 * 1024;
+my $bytes = "";
+my $top = 0;
+my $cur = 0;
 
-read(IN, $bytes, $bsize);
-#print $bytes;
-$top = 0;
-$cur = 20;
+seek(IN, 0, 2);
+my $file_size = tell(IN);
+
+sub read_file
+{
+    seek(IN, $top, 0);
+    $bytes = "";
+    my $r = read(IN, $bytes, $bsize);
+    return ($r != 0);
+}
+
+read_file();
 
 sub to_ascii
 {
@@ -52,48 +64,50 @@ $lines = 25;
 sub print_page
 {
     printf("\n\n\n\n\n\n");
+#    printf("buffer length : %i\n", length($bytes));
+
     for (my $i = 0; $i < $lines; $i++)
     {
-	printf("%08x ", $top + $i*$width);
+	printf("0x%08x  ", $top + $i*$width);
 
 	# Regular hex dump
 	for (my $j = 0; $j < $width; $j++)
 	{
-	    my $p = $top + $i*$width + $j;
-	    print("$inv_video") if ($p == $cur);
+	    my $p = $i*$width + $j;
+	    print("$inv_video") if ($top + $p == $cur);
 	    printf("%02x", ord(substr($bytes, $p, 1)) );
-	    print("$end") if ($p == $cur);
+	    print("$end") if ($top + $p == $cur);
 	    printf(" ") if (($j+1) % 4 == 0);		
 	}
 
 	# ascii/multi-byte characters
 	printf("    ");
-	my $line = $top + $i * $width;
-	if ($line <= $cur && $cur < $line + $width)	# Highlight character at cursor
+	my $line = $i * $width;
+	if ($top + $line <= $cur && $cur < $top + $line + $width)	# Highlight character at cursor
 	{
 	    my $off = $line;
-	    my $split = $cur;
+	    my $split = $cur - ($top + $line);
 	    my $len = 1;
 
 	    # Don't split multi-byte characters !
-	    if (length(to_jap(substr($bytes, $line, $cur - $line))) == 
-		length(to_jap(substr($bytes, $line, $cur - $line + 1))))
+	    if (length(to_jap(substr($bytes, $line, $split))) == 
+		length(to_jap(substr($bytes, $line, $split + 1))))
 	    {  $len++;   }		# multi-byte char at cursor
 
-	    if (($cur - $line) &&
-		length(to_jap(substr($bytes, $line, $cur - $line))) == 
-		length(to_jap(substr($bytes, $line, $cur - $line - 1))))
+	    if (($split) &&
+		length(to_jap(substr($bytes, $line, $split))) == 
+		length(to_jap(substr($bytes, $line, $split - 1))))
 	    {  $len++; $split--;  }	# multi-byte char starts before cursor
 	    
-	    my $s = to_jap(substr($bytes, $off, $split - $line));	    
+	    my $s = to_jap(substr($bytes, $off, $split));	    
 	    printf("%s%s", $s, $inv_video);
-	    $off += $split - $line;
+	    $off += $split;
 	    
 	    my $s = to_jap(substr($bytes, $off, $len));
 	    printf("%s%s", $s, $end);
 	    $off += $len;
 
-	    my $s = to_jap(substr($bytes, $off, $width - $len - ($split - $line)));
+	    my $s = to_jap(substr($bytes, $off, $width - $len - $split));
 	    printf("%s", $s);
 	}
 	else 
@@ -102,6 +116,20 @@ sub print_page
 	    printf("%s", $s);
 	}
 	printf("\n");
+    }
+}
+
+sub read_line
+{
+    my $s = "";
+    while (1)
+    {
+	my $key = readkey();
+	if ($key eq "\n")
+	{  return $s;  }
+
+	print "$key";  STDOUT->flush();	
+	$s .= $key;
     }
 }
 
@@ -147,7 +175,7 @@ sub check_up
      {
 	 $top -= $lines * $width;
 	 if ($top < 0) { $top = 0; }
-	 read(IN, $bytes, $bsize, $top);
+	 read_file();
      }
 }
 
@@ -156,14 +184,55 @@ sub check_down
     if ($cur > $top + $lines * $width) 
     {
 	$top += $lines * $width;
-	read(IN, $bytes, $bsize, $top);
+	read_file();
     }
+}
+
+sub search_forward
+{
+    my ($s) = @_;
+    printf("\nsearching for '%s'\n", $s);
+    if ($s eq "")
+    { return; }
+
+    # Move to current position
+    my $old_top = $top;
+    $top = $cur + 1;    read_file();
+
+    while (! ($bytes =~ m/$s/))
+    {  
+	$top += $bsize; 
+	if (!read_file())      # Not found, go back to starting point
+	{  
+	    printf("Not found\n");
+	    $top = $old_top; read_file(); return; 
+	}
+    }
+    
+    my $i = index($bytes, $s, 0);
+    if ($i == -1)
+    { printf("Eeek bug, index says not found\n"); }
+    else
+    {
+	printf("Found at 0x%08x\n", $top + $i);
+	$cur = $top + $i;
+	if ($cur > $top + $lines * $width) 
+	{
+	    $top = $cur;
+	    read_file();   
+	}
+    }
+
+    # Keep original position if on the same page
+    if ($old_top <= $top && $top < $old_top + $lines * $width)
+    {  $top = $old_top;  read_file();    }
+
 }
 
 while (1)
 {
     my $key = read_key();
-    print "\n";
+#    print "\n";
 #    printf("key: %s\n", $key);
 
     if ($key eq "left")
@@ -179,6 +248,22 @@ while (1)
     {  $cur += $width;  check_down(); }
     if ($key eq "pgdn")
     {  $cur += $lines * $width;  check_down();    }
+
+    if ($key eq "<")
+    {  $cur = $top = 0; read_file(); }
+    if ($key eq ">")
+    {
+	$cur = $file_size - 1;
+	$top = $cur - $lines * $width + 1;
+	read_file();
+    }
+
+
+    if ($key eq "/")
+    {  
+	print "/";  STDOUT->flush();
+	search_forward(read_line()); 
+    }
 
     print_page();
 }
