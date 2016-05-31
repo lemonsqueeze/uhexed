@@ -9,11 +9,11 @@ my $inv_video = "\e[7m";
 binmode STDOUT, ":utf8";
 my $file = $ARGV[0];
 
-open(FILE, "+< $file") || die "couldn't open $file";
+open(FILE, "+<", $file) || die "couldn't open $file";
 #binmode FILE, ':binary';
 
-
-#@array = <FILE>;
+# Enable unicode input for search ?
+my $unicode_mode = 1;
 
 # Buffer size
 my $bsize = 8192;
@@ -54,8 +54,6 @@ sub to_jap
     my ($s) = @_;
     $s = Encode::decode("cp932", $s );    
 
-    # $s =~ s/[\t\n\r\0]/./g;
-
     my @a = split("", $s);
     for (my $i = 0; $i < @a; $i++)
     {
@@ -71,7 +69,6 @@ $lines = 25;
 sub print_page
 {
     printf("\n\n\n\n\n\n");
-#    printf("buffer length : %i\n", length($bytes));
 
     for (my $i = 0; $i < $lines; $i++)
     {
@@ -126,6 +123,30 @@ sub print_page
     }
 }
 
+sub read_line_unicode
+{
+    my ($prompt) = @_;
+    print "$prompt";  STDOUT->flush();
+    my $s = "";
+    while (1)
+    {
+	my $key = readkey();
+	if ($key eq "\n")
+	{  return Encode::decode("utf-8", $s);  }
+	if (ord($key) == 0x7f)  # Backspace
+	{ 
+	   my $s2 = $s;  $s2 =~ s/./ /g;
+	   printf("\r%s%s", $prompt, Encode::decode("utf-8", $s2));  STDOUT->flush(); 
+	   $s = substr($s, 0, length($s)-1); 
+	   printf("\r%s%s", $prompt, Encode::decode("utf-8", $s));  STDOUT->flush(); 
+	   next;
+	}
+
+	printf("\r%s%s", $prompt, Encode::decode("utf-8", $s));  STDOUT->flush(); 
+	$s .= $key;
+    }
+}
+
 sub read_line
 {
     my ($prompt) = @_;
@@ -135,13 +156,13 @@ sub read_line
     {
 	my $key = readkey();
 	if ($key eq "\n")
-	{  return $s;  }
+	{  return $s;	}
 	if (ord($key) == 0x7f)  # Backspace
 	{ 
 	   my $s2 = $s;  $s2 =~ s/./ /g;
-	   print "\r$prompt$s2"; STDOUT->flush();
+	   printf("\r%s%s", $prompt, $s2);  STDOUT->flush(); 
 	   $s = substr($s, 0, length($s)-1); 
-	   print "\r$prompt$s"; STDOUT->flush(); 
+	   printf("\r%s%s", $prompt, $s);  STDOUT->flush(); 
 	   next;
 	}
 
@@ -216,7 +237,10 @@ sub search_forward
     my $old_top = $top;
     $top = $cur + 1;    read_file();
 
-    while (! ($bytes =~ m/$s/))
+    my $ubytes;
+    $ubytes = ($unicode_mode ? Encode::decode("cp932", $bytes) : $bytes);
+    
+    while (! ($ubytes =~ m/$s/))
     {  
 	$top += $bsize; 
 	if (!read_file())      # Not found, go back to starting point
@@ -224,9 +248,13 @@ sub search_forward
 	    printf("Not found\n");
 	    $top = $old_top; read_file(); return; 
 	}
+
+	$ubytes = ($unicode_mode ? Encode::decode("cp932", $bytes) : $bytes);
     }
     
-    my $i = index($bytes, $s, 0);
+    my $i = index($ubytes, $s, 0);
+    if ($unicode_mode)  # Find real offset
+    {  $i = length(Encode::encode("cp932", substr($ubytes, 0, $i)));  }
     if ($i == -1)
     { printf("Eeek bug, index says not found\n"); }
     else
@@ -289,9 +317,18 @@ while (1)
 	$top = $cur - $lines * $width + 1;
 	read_file();
     }
-
+    if ($key eq "")
+    {
+	$top = $cur - $lines/2 * $width;
+	if ($top < 0) { $top = 0; }
+	read_file();
+    }
+    
+    if ($key eq "U")
+    {  $unicode_mode = !$unicode_mode; printf("Unicode mode: %i\n", $unicode_mode); }
+    
     if ($key eq "/")
-    {  search_forward(read_line("/"));  }
+    {  search_forward(($unicode_mode ? read_line_unicode("/") : read_line("/")));  }
 
     if ($key eq "w")
     {  write_string(read_line("write: "));   }
