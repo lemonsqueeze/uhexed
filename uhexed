@@ -15,6 +15,10 @@ open(FILE, "+<", $file) || die "couldn't open $file";
 # Enable unicode input for search ?
 my $unicode_mode = 1;
 
+my $encoding = "cp932";   # Windows codepage 932 - Japanese (Shift-JIS)
+#my $encoding = "utf-8";
+#my $encoding = "utf-16";
+
 # Buffer size
 my $bsize = 8192;
 my $bytes = "";
@@ -52,7 +56,7 @@ sub to_ascii
 sub to_jap
 {
     my ($s) = @_;
-    $s = Encode::decode("cp932", $s );    
+    $s = Encode::decode($encoding, $s );    
 
     my @a = split("", $s);
     for (my $i = 0; $i < @a; $i++)
@@ -62,6 +66,60 @@ sub to_jap
     }	    
 
     return join("", @a);
+}
+
+sub print_chars_jap
+{
+    my ($i) = @_;
+
+    # ascii/multi-byte characters
+    my $line = $i * $width;
+    if ($top + $line <= $cur && $cur < $top + $line + $width)	# Highlight character at cursor
+    {
+	my $off = $line;
+	my $split = $cur - ($top + $line);
+	my $len = 1;
+
+	# Don't split multi-byte characters !
+	if (length(to_jap(substr($bytes, $line, $split))) == 
+	    length(to_jap(substr($bytes, $line, $split + 1))))
+	{  $len++;   }		# multi-byte char at cursor
+
+	if (($split) &&
+	    length(to_jap(substr($bytes, $line, $split))) == 
+	    length(to_jap(substr($bytes, $line, $split - 1))))
+	{  $len++; $split--;  }	# multi-byte char starts before cursor
+	
+	my $s = to_jap(substr($bytes, $off, $split));	    
+	printf("%s%s", $s, $inv_video);
+	$off += $split;
+	
+	my $s = to_jap(substr($bytes, $off, $len));
+	printf("%s%s", $s, $end);
+	$off += $len;
+
+	my $s = to_jap(substr($bytes, $off, $width - $len - $split));
+	printf("%s", $s);
+    }
+    else 
+    { 
+	my $s = to_jap(substr($bytes, $line, $width));
+	printf("%s", $s);
+    }
+}
+
+sub print_chars_ascii
+{
+    my ($i) = @_;
+    
+    for (my $j = 0; $j < $width; $j++)
+    {
+	my $p = $i*$width + $j;
+	print("$inv_video") if ($top + $p == $cur);
+	printf("%s", to_ascii(substr($bytes, $p, 1)));
+	print("$end") if ($top + $p == $cur);
+	#printf(" ") if (($j+1) % 4 == 0);		
+    }    
 }
 
 $width = 28;
@@ -84,41 +142,10 @@ sub print_page
 	    printf(" ") if (($j+1) % 4 == 0);		
 	}
 
-	# ascii/multi-byte characters
 	printf("    ");
-	my $line = $i * $width;
-	if ($top + $line <= $cur && $cur < $top + $line + $width)	# Highlight character at cursor
-	{
-	    my $off = $line;
-	    my $split = $cur - ($top + $line);
-	    my $len = 1;
+	print_chars_jap($i);
+	#print_chars_ascii($i);
 
-	    # Don't split multi-byte characters !
-	    if (length(to_jap(substr($bytes, $line, $split))) == 
-		length(to_jap(substr($bytes, $line, $split + 1))))
-	    {  $len++;   }		# multi-byte char at cursor
-
-	    if (($split) &&
-		length(to_jap(substr($bytes, $line, $split))) == 
-		length(to_jap(substr($bytes, $line, $split - 1))))
-	    {  $len++; $split--;  }	# multi-byte char starts before cursor
-	    
-	    my $s = to_jap(substr($bytes, $off, $split));	    
-	    printf("%s%s", $s, $inv_video);
-	    $off += $split;
-	    
-	    my $s = to_jap(substr($bytes, $off, $len));
-	    printf("%s%s", $s, $end);
-	    $off += $len;
-
-	    my $s = to_jap(substr($bytes, $off, $width - $len - $split));
-	    printf("%s", $s);
-	}
-	else 
-	{ 
-	    my $s = to_jap(substr($bytes, $line, $width));
-	    printf("%s", $s);
-	}
 	printf("\n");
     }
 }
@@ -238,7 +265,7 @@ sub search_forward
     $top = $cur + 1;    read_file();
 
     my $ubytes;
-    $ubytes = ($unicode_mode ? Encode::decode("cp932", $bytes) : $bytes);
+    $ubytes = ($unicode_mode ? Encode::decode($encoding, $bytes) : $bytes);
     
     while (! ($ubytes =~ m/$s/))
     {  
@@ -249,12 +276,12 @@ sub search_forward
 	    $top = $old_top; read_file(); return; 
 	}
 
-	$ubytes = ($unicode_mode ? Encode::decode("cp932", $bytes) : $bytes);
+	$ubytes = ($unicode_mode ? Encode::decode($encoding, $bytes) : $bytes);
     }
     
     my $i = index($ubytes, $s, 0);
     if ($unicode_mode)  # Find real offset
-    {  $i = length(Encode::encode("cp932", substr($ubytes, 0, $i)));  }
+    {  $i = length(Encode::encode($encoding, substr($ubytes, 0, $i)));  }
     if ($i == -1)
     { printf("Eeek bug, index says not found\n"); }
     else
