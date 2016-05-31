@@ -9,27 +9,34 @@ my $inv_video = "\e[7m";
 binmode STDOUT, ":utf8";
 my $file = $ARGV[0];
 
-open(IN, "< $file") || die "couldn't open $file";
-#binmode IN, ':binary';
+open(FILE, "+< $file") || die "couldn't open $file";
+#binmode FILE, ':binary';
 
 
-#@array = <IN>;
+#@array = <FILE>;
 
 # Buffer size
-my $bsize = 100 * 1024;
+my $bsize = 8192;
 my $bytes = "";
 my $top = 0;
 my $cur = 0;
 
-seek(IN, 0, 2);
-my $file_size = tell(IN);
+seek(FILE, 0, 2);
+my $file_size = tell(FILE);
 
 sub read_file
 {
-    seek(IN, $top, 0);
+    sysseek(FILE, $top, 0);
     $bytes = "";
-    my $r = read(IN, $bytes, $bsize);
+    my $r = sysread(FILE, $bytes, $bsize);
     return ($r != 0);
+}
+
+sub write_file
+{
+    sysseek(FILE, $top, 0);
+    my $r = syswrite(FILE, $bytes, $bsize);
+    return ($r == $bsize);
 }
 
 read_file();
@@ -236,7 +243,22 @@ sub search_forward
     # Keep original position if on the same page
     if ($old_top <= $top && $top < $old_top + $lines * $width)
     {  $top = $old_top;  read_file();    }
+}
 
+sub write_string
+{
+    my ($s) = @_;
+    my $off = $cur - $top;
+    $bytes = (substr($bytes, 0, $off) . $s .
+	      substr($bytes, $off + length($s)));
+    write_file();
+}
+
+sub change_hex
+{
+    my $s = read_line("Hex: 0x");
+    my $c = chr($s);
+    write_string($c);
 }
 
 while (1)
@@ -269,14 +291,13 @@ while (1)
     }
 
     if ($key eq "/")
-    {  
-	search_forward(read_line("/")); 
-    }
+    {  search_forward(read_line("/"));  }
 
     if ($key eq "w")
-    {  
-	#search_forward(read_line("write: ")); 
-    }
+    {  write_string(read_line("write: "));   }
+
+    if ($key eq "x")
+    {  change_hex(); }
 
     print_page();
 }
