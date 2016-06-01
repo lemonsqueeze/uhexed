@@ -253,12 +253,16 @@ sub check_down
     }
 }
 
+
+my $last_search = "";
 sub search_forward
 {
     my ($s) = @_;
     printf("\nsearching for '%s'\n", $s);
     if ($s eq "")
     { return; }
+
+    $last_search = $s;
 
     # Move to current position
     my $old_top = $top;
@@ -356,6 +360,9 @@ while (1)
     
     if ($key eq "/")
     {  search_forward(($unicode_mode ? read_line_unicode("/") : read_line("/")));  }
+    if ($key eq "n")
+    {  search_forward($last_search);  }
+
 
     if ($key eq "w")
     {  write_string(read_line("write: "));   }
