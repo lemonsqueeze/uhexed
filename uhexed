@@ -44,6 +44,17 @@ my $blank = join("", map { " " } (1..$tcols) );
 my $bl = $blank . "\n";		# blank line
 my $clear_screen = 0;
 
+my $bold =   "\e[40;37;1m";
+my $blue =   "\e[40;34m";
+my $bblue =   "\e[40;34;1m";
+my $cyan =   "\e[40;36m";
+my $bcyan =   "\e[40;36;1m";
+my $purple = "\e[40;35m";
+my $yellow = "\e[40;33m";
+my $byellow = "\e[40;33;1m";
+my $red =    "\e[40;31m";
+my $green =  "\e[40;32m";
+my $normal = "\e[40;37m";
 my $end  =   "\e[0m";
 my $inv_video = "\e[7m";
 my $cls = "\e[2J";
@@ -112,7 +123,7 @@ sub to_multibyte
 
 sub print_chars_multibyte
 {
-    my ($i) = @_;
+    my ($i, $col) = @_;
 
     # ascii/multi-byte characters
     my $line = $i * $width;
@@ -137,7 +148,7 @@ sub print_chars_multibyte
 	$off += $split;
 	
 	my $s = to_multibyte(substr($bytes, $off, $len));
-	printf("%s%s", $s, $end);
+	printf("%s$end$col", $s);
 	$off += $len;
 
 	my $s = to_multibyte(substr($bytes, $off, $width - $len - $split));
@@ -152,14 +163,14 @@ sub print_chars_multibyte
 
 sub print_chars_ascii
 {
-    my ($i) = @_;
+    my ($i, $col) = @_;
     
     for (my $j = 0; $j < $width; $j++)
     {
 	my $p = $i*$width + $j;
 	print("$inv_video") if ($top + $p == $cur);
 	printf("%s", to_ascii(substr($bytes, $p, 1)));
-	print("$end") if ($top + $p == $cur);
+	print("$end$col") if ($top + $p == $cur);
 	#printf(" ") if (($j+1) % 4 == 0);		
     }    
 }
@@ -190,25 +201,31 @@ sub print_page
     for (my $i = 0; $i < $lines; $i++)
     {
 	if ($clear_screen) { clear_line(); }
-	printf("0x%08x  ", $top + $i*$width);
+	my $current_line = ($top + $i*$width <= $cur && $cur < $top + ($i+1)*$width ? 1 : 0);
+	my $col = ($current_line ? $byellow : $yellow);
+	printf("${col}0x%08x${end}  ", $top + $i*$width);
 
 	# Regular hex dump
+	my $col = ($current_line ? $bblue : $blue);
+	print "$col";
 	for (my $j = 0; $j < $width; $j++)
 	{
 	    my $p = $i*$width + $j;
 	    print("$inv_video") if ($top + $p == $cur);
 	    printf("%02x", ord(substr($bytes, $p, 1)) );
-	    print("$end") if ($top + $p == $cur);
+	    print("$end$col") if ($top + $p == $cur);
 	    printf(" ") if (($j+1) % 4 == 0);		
 	}
+	print "$end";
 
-	printf("    ");
+	my $col = ($current_line ? $bold : $normal);
+	printf("    $col");
 	if ($encoding eq "ascii")
-	{   print_chars_ascii($i);  }
+	{   print_chars_ascii($i, $col);  }
 	else
-	{   print_chars_multibyte($i);    }
+	{   print_chars_multibyte($i, $col);    }
 	
-	printf("  \n");
+	printf("$end  \n");
     }
 
     print "$bl";
