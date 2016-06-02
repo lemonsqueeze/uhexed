@@ -447,18 +447,18 @@ while (1)
 #    printf("key: '%s' 0x%02x\n", $key, ord($key));
 
     # Move commands
-    if ($key eq "left")
+    if ($key eq "left" || $key eq "")
     {  $cur--; check_up();    }
-    if ($key eq "up")
+    if ($key eq "up" || $key eq "")
     {  $cur -= $width;  check_up();    }
-    if ($key eq "pgup")
+    if ($key eq "pgup" || $key eq "Escv")
     {  $cur -= $lines * $width;  check_up();    }
 
-    if ($key eq "right")
+    if ($key eq "right" || $key eq "")
     {  $cur++;  check_down(); }
-    if ($key eq "down")
+    if ($key eq "down" || $key eq "")
     {  $cur += $width;  check_down(); }
-    if ($key eq "pgdn")
+    if ($key eq "pgdn" || $key eq "")
     {  $cur += $lines * $width;  check_down();    }
 
     if ($key eq "ctrl_pgdn")
