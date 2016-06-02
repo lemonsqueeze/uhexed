@@ -2,27 +2,35 @@
 use Encode qw(decode encode);
 use HotKey;
 
-# Enable unicode input for search ?
-my $unicode_mode = 1;
-
-my $encoding = "cp932";   # Windows codepage 932 - Japanese Shift-JIS
-#my $encoding = "utf-8";
+#my $encoding = "cp932";   # Windows codepage 932 - Japanese Shift-JIS
+my $encoding = "utf-8";
 #my $encoding = "utf-16le";
+#my $encoding = "ascii";
 
 #my $paint = "dumb";       # debugging
 my $paint = "term";
+
+
+if ($ARGV[0] eq "-e")
+{  shift @ARGV; $encoding = $ARGV[0]; shift @ARGV; }
+
+######################################################################
+
+# Enable unicode input for search ?
+my $unicode_mode = 1;
+
 
 # Terminal stuff
 my $tcols = `tput cols`;
 my $tlines = `tput lines`;
 my $blank = join("", map { " " } (1..$tcols) );
 my $bl = $blank . "\n";		# blank line
+my $clear_screen = 0;
 
 my $end  =   "\e[0m";
 my $inv_video = "\e[7m";
 my $cls = "\e[2J";
 my $cursor_top = "\e[0;0H";	# ESC[y;xH  move cursor to row y, col x
-
 
 
 binmode STDOUT, ":utf8";
@@ -48,6 +56,7 @@ sub read_file
     sysseek(FILE, $top, 0);
     $bytes = "";
     my $r = sysread(FILE, $bytes, $bsize);
+    $clear_screen = 1;
     return ($r != 0);
 }
 
@@ -58,8 +67,6 @@ sub write_file
     return ($r == $bsize);
 }
 
-read_file();
-
 sub to_ascii
 {
     my ($c) = @_;
@@ -68,7 +75,7 @@ sub to_ascii
     return ".";
 }
 
-sub to_jap
+sub to_multibyte
 {
     my ($s) = @_;
     $s = Encode::decode($encoding, $s );    
@@ -83,7 +90,7 @@ sub to_jap
     return join("", @a);
 }
 
-sub print_chars_jap
+sub print_chars_multibyte
 {
     my ($i) = @_;
 
@@ -96,29 +103,29 @@ sub print_chars_jap
 	my $len = 1;
 
 	# Don't split multi-byte characters !
-	if (length(to_jap(substr($bytes, $line, $split))) == 
-	    length(to_jap(substr($bytes, $line, $split + 1))))
+	if (length(to_multibyte(substr($bytes, $line, $split))) == 
+	    length(to_multibyte(substr($bytes, $line, $split + 1))))
 	{  $len++;   }		# multi-byte char at cursor
 
 	if (($split) &&
-	    length(to_jap(substr($bytes, $line, $split))) == 
-	    length(to_jap(substr($bytes, $line, $split - 1))))
+	    length(to_multibyte(substr($bytes, $line, $split))) == 
+	    length(to_multibyte(substr($bytes, $line, $split - 1))))
 	{  $len++; $split--;  }	# multi-byte char starts before cursor
 	
-	my $s = to_jap(substr($bytes, $off, $split));	    
+	my $s = to_multibyte(substr($bytes, $off, $split));	    
 	printf("%s%s", $s, $inv_video);
 	$off += $split;
 	
-	my $s = to_jap(substr($bytes, $off, $len));
+	my $s = to_multibyte(substr($bytes, $off, $len));
 	printf("%s%s", $s, $end);
 	$off += $len;
 
-	my $s = to_jap(substr($bytes, $off, $width - $len - $split));
+	my $s = to_multibyte(substr($bytes, $off, $width - $len - $split));
 	printf("%s", $s);
     }
     else 
     { 
-	my $s = to_jap(substr($bytes, $line, $width));
+	my $s = to_multibyte(substr($bytes, $line, $width));
 	printf("%s", $s);
     }
 }
@@ -157,10 +164,11 @@ sub print_page
     print "$bl$bl$bl$bl";
 
     clear_line();
-    printf("(%i%%)\n", $top * 100 / $file_size);
+    printf("%-11s ($encoding)\n", sprintf("(%i%%)", $top * 100 / $file_size));
 
     for (my $i = 0; $i < $lines; $i++)
     {
+	if ($clear_screen) { clear_line(); }
 	printf("0x%08x  ", $top + $i*$width);
 
 	# Regular hex dump
@@ -174,13 +182,16 @@ sub print_page
 	}
 
 	printf("    ");
-	print_chars_jap($i);
-	#print_chars_ascii($i);
-
+	if ($encoding eq "ascii")
+	{   print_chars_ascii($i);  }
+	else
+	{   print_chars_multibyte($i);    }
+	
 	printf("  \n");
     }
 
     print "$bl";
+    $clear_screen = 0;
 }
 
 sub read_line_unicode
@@ -389,6 +400,7 @@ sub change_hex
 # Clear screen
 if ($paint eq "term") { print($cls); }
 
+read_file();
 print_page();
 
 
@@ -448,6 +460,10 @@ while (1)
 
     if ($key eq "x")
     {  change_hex(); }
+
+    if ($key eq "q")
+    {  exit 0;  }
+
 
     print_page();
 }
