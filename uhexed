@@ -1,19 +1,35 @@
 #!/usr/bin/perl
+# uhexed
+# Simple multi-byte hex editor
+# http://github.com/lemonsqueeze/uhexed
+
 use Encode qw(decode encode);
 use HotKey;
 
-#my $encoding = "cp932";   # Windows codepage 932 - Japanese Shift-JIS
+# Default encoding
 my $encoding = "utf-8";
+#my $encoding = "cp932";   # Windows codepage 932 - Japanese Shift-JIS
 #my $encoding = "utf-16le";
 #my $encoding = "ascii";
 
+# Redraw method
 #my $paint = "dumb";       # debugging
 my $paint = "term";
+
+if ($ARGV[0] eq "-h")
+{ 
+    print "Usage: uhexed [-e encoding] binary_file\n";
+    print "\n";
+    print "Simple multi-byte hex editor\n";
+    print "Press 'h' for help with keys\n";
+    exit 1;
+}
 
 
 if ($ARGV[0] eq "-e")
 {  shift @ARGV; $encoding = $ARGV[0]; shift @ARGV; }
 my $encoding_last = $encoding;
+
 
 ######################################################################
 
@@ -168,7 +184,8 @@ sub print_page
     print "$bl$bl$bl$bl";
 
     clear_line();
-    printf("%-11s ($encoding)\n", sprintf("(%i%%)", $top * 100 / $file_size));
+    printf("%-11s %*s($encoding)\n", sprintf("(%i%%)", $top * 100 / $file_size), 
+	   $width * 2 + $width / 4 + 4, "");
 
     for (my $i = 0; $i < $lines; $i++)
     {
@@ -430,12 +447,48 @@ sub goto_address
     $cur = $top = $s; read_file();
 }
 
+sub help
+{
+    print "$cls";
+    print "\n";
+    print "Moving around:\n";
+    print "  up down left right  Move cursor\n";
+    print "                      Emacs-style keys work too\n";
+    print "  pgup pgdn           Scroll up/down one page\n";
+    print "  C-pgup C-pgdn       Move up/down 1% of file\n";
+    print "  <  >                Move to beginning/end\n";    
+    print "  g                   Goto address\n";
+    print "\n";
+    print "Display:\n";
+    print "  a                   Toggle ascii/multibyte display\n";
+    print "  C-l                 Center on current position\n";
+    print "\n";
+    print "Searching:\n";
+    print "  /                   Forward search\n";
+    print "  n                   Repeat last search\n";
+    print "  U                   Toggle unicode/ascii search\n";
+    print "  X                   Set hex search mode\n";
+    print "\n";
+    print "Editing:\n";
+    print "  w                   Write line at current address (ascii)\n";
+    print "  x                   Change hex value\n";
+    print "\n";
+    print "Misc:\n";
+    print "  h                   Help\n";
+    print "  q                   Quit\n";
+    print "\n\n";
+    print "[ Any key to continue ]"; STDOUT->flush();
+
+    my $q = read_key();     print "$cls";    
+}
+
 #####################################################################
 
 
 # Clear screen
 if ($paint eq "term") { print($cls); }
 
+$status = "[uhexed]  Press 'h' for help";
 read_file();
 print_page();
 
@@ -458,7 +511,7 @@ while (1)
     {  $cur++;  check_down(); }
     if ($key eq "down" || $key eq "")
     {  $cur += $width;  check_down(); }
-    if ($key eq "pgdn" || $key eq "")
+    if ($key eq "pgdn" || $key eq " " || $key eq "")
     {  $cur += $lines * $width;  check_down();    }
 
     if ($key eq "ctrl_pgdn")
@@ -501,6 +554,10 @@ while (1)
 
     if ($key eq "x")
     {  change_hex(); }
+
+    # Misc
+    if ($key eq "h" || $key eq "?")
+    {  help();  }
 
     if ($key eq "q")
     {  exit 0;  }
