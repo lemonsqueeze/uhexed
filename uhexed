@@ -7,7 +7,7 @@ my $unicode_mode = 1;
 
 my $encoding = "cp932";   # Windows codepage 932 - Japanese (Shift-JIS)
 #my $encoding = "utf-8";
-#my $encoding = "utf-16";
+#my $encoding = "utf-16le";
 
 #my $paint = "dumb";       # debugging
 my $paint = "term";
@@ -21,6 +21,7 @@ my $bl = $blank . "\n";		# blank line
 my $end  =   "\e[0m";
 my $inv_video = "\e[7m";
 my $cls = "\e[2J";
+my $cursor_top = "\e[0;0H";	# ESC[y;xH  move cursor to row y, col x
 
 
 
@@ -141,19 +142,16 @@ $lines = 25;
 sub print_page
 {    
     if ($paint eq "term")
-    {
-	# ESC[y;xH  move cursor to row y, col x
-	printf("\e[0;0H");
-    }
+    {	print "$cursor_top";   }
 
     # Status line
     printf("%s", ($status ne "" ? $status : "$bl"));
     $status = "";
 
-    if ($paint eq "dumb")
-    {   printf("\n\n\n\n\n\n");   }
-    else
-    {  print "$bl$bl$bl$bl";      }
+    print "$bl$bl$bl$bl";
+
+    clear_line();
+    printf("(%i%%)\n", $top * 100 / $file_size);
 
     for (my $i = 0; $i < $lines; $i++)
     {
@@ -176,8 +174,7 @@ sub print_page
 	printf("  \n");
     }
 
-    if ($paint eq "term")
-    {   print "$bl"; }
+    print "$bl";
 }
 
 sub clear_line
@@ -237,20 +234,21 @@ sub read_line
 sub read_key
 {
     my $s, $key;
-    $key = readkey();   
-    $s = $key;
+    $key = readkey();  $s = $key;
     if ($key eq "\e")
     {
-	$key = readkey();
-	$s = "Esc$key";
+	$key = readkey();  $s = "Esc$key";
 	if ($key eq "[") 
 	{
-	    $key = readkey();
-	    $s .= $key;
+	    $key = readkey();  $s .= $key;
 	    if ($key eq "5" || $key eq "6") 
 	    {
-		$key = readkey();
-		$s .= $key;
+		$key = readkey();  $s .= $key;
+		if ($key eq ";")
+		{
+		    $key = readkey();  $s .= $key;
+		    $key = readkey();  $s .= $key;
+		}
 	    }
 	}
     }
@@ -261,6 +259,8 @@ sub read_key
     $s =~ s/Esc\[B/down/;
     $s =~ s/Esc\[5~/pgup/;
     $s =~ s/Esc\[6~/pgdn/;
+    $s =~ s/Esc\[5;5~/ctrl_pgup/;
+    $s =~ s/Esc\[6;5~/ctrl_pgdn/;
     $s =~ s/\n/enter/;
 
     return $s;
@@ -279,7 +279,7 @@ sub check_up
 
 sub check_down
 {
-    if ($cur > $top + $lines * $width) 
+    if ($cur >= $top + $lines * $width) 
     {
 	$top += $lines * $width;
 	read_file();
@@ -382,6 +382,12 @@ while (1)
     if ($key eq "pgdn")
     {  $cur += $lines * $width;  check_down();    }
 
+    if ($key eq "ctrl_pgdn")
+    {  $top += int($file_size / 100); $top += $top % 2;  $cur = $top; read_file(); }
+    if ($key eq "ctrl_pgup")
+    {  $top -= int($file_size / 100); $top += $top % 2;  if ($top < 0) { $top = 0; } $cur = $top; read_file(); }
+
+
     if ($key eq "<")
     {  $cur = $top = 0; read_file(); }
     if ($key eq ">")
@@ -392,6 +398,7 @@ while (1)
     }
     if ($key eq "")
     {
+	print "$cls";
 	$top = $cur - $lines/2 * $width;
 	if ($top < 0) { $top = 0; }
 	read_file();
