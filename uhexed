@@ -195,8 +195,8 @@ sub print_page
     print "$bl$bl$bl$bl";
 
     clear_line();
-    printf("%-11s %*s($encoding)\n", sprintf("(%i%%)", $top * 100 / $file_size), 
-	   $width * 2 + $width / 4 + 4, "");
+    printf("${green}0x%08x  %-7s %*s($encoding)${end}\n", $cur, sprintf("(%i%%)", $top * 100 / $file_size), 
+	   $width * 2 + $width / 4 - 4, "");
 
     for (my $i = 0; $i < $lines; $i++)
     {
@@ -464,6 +464,21 @@ sub goto_address
     $cur = $top = $s; read_file();
 }
 
+my $prev_center_on;
+sub center_on
+{
+    if ($prev_center_on == $cur && $top == $cur - $lines/2 * $width)
+    {   $top = $cur;  }					# Top
+    elsif ($prev_center_on == $cur && $top == $cur)
+    {   $top = $cur - $lines * $width + 1;  }		# Bottom
+    else
+    {   $top = $cur - $lines/2 * $width;  }		# Center
+    
+    if ($top < 0) { $top = 0; }
+    read_file(); print "$cls"; 
+    $prev_center_on = $cur;
+}
+
 sub help
 {
     print "$cls";
@@ -548,7 +563,7 @@ while (1)
     if ($key eq "a")
     {  $encoding = ($encoding eq "ascii" ? $encoding_last : "ascii");  read_file();  }
     if ($key eq "")
-    {  $top = $cur - $lines/2 * $width; if ($top < 0) { $top = 0; }  read_file(); print "$cls";   }
+    {  center_on();  }
 
     # Search commands
     if ($key eq "/")
