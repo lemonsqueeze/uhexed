@@ -54,6 +54,7 @@ my $yellow = "\e[40;33m";
 my $byellow = "\e[40;33;1m";
 my $red =    "\e[40;31m";
 my $green =  "\e[40;32m";
+my $bgreen =  "\e[40;32;1m";
 my $normal = "\e[40;37m";
 my $end  =   "\e[0m";
 my $inv_video = "\e[7m";
@@ -191,25 +192,23 @@ sub print_page
 
     # Status line
     clear_line();
-    printf("%s", ($status ne "" ? $status : "\n"));
+    printf("${green}%s", ($status ne "" ? $status : "\n"));
     $status = "";
 
     print "$bl$bl$bl$bl";
 
     clear_line();
-    printf("${green}0x%08x  %-7s %*s($encoding)${end}\n", $cur, sprintf("(%i%%)", $top * 100 / $file_size), 
+    printf("${bgreen}0x%08x  %-7s %*s($encoding)${end}\n", $cur, sprintf("(%i%%)", $top * 100 / $file_size), 
 	   $width * 2 + $width / 4 - 4, "");
 
     for (my $i = 0; $i < $lines; $i++)
     {
 	if ($clear_screen) { clear_line(); }
 	my $current_line = ($top + $i*$width <= $cur && $cur < $top + ($i+1)*$width ? 1 : 0);
-	my $col = ($current_line ? $byellow : $yellow);
-	printf("${col}0x%08x${end}  ", $top + $i*$width);
+	my $col = ($current_line ? $bgreen : $green);
+	printf("${col}0x%08x  ", $top + $i*$width);
 
 	# Regular hex dump
-	my $col = ($current_line ? $bblue : $blue);
-	print "$col";
 	for (my $j = 0; $j < $width; $j++)
 	{
 	    my $p = $i*$width + $j;
@@ -218,10 +217,8 @@ sub print_page
 	    print("$end$col") if ($top + $p == $cur);
 	    printf(" ") if (($j+1) % 4 == 0);		
 	}
-	print "$end";
 
-	my $col = ($current_line ? $bold : $normal);
-	printf("    $col");
+	printf("    ");
 	if ($encoding eq "ascii")
 	{   print_chars_ascii($i, $col);  }
 	else
@@ -483,7 +480,7 @@ sub center_on
 
 sub help
 {
-    print "$cls";
+    print "$cls$green";
     print "\n";
     print "Moving around:\n";
     print "  up down left right  Move cursor\n";
