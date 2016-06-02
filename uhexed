@@ -13,11 +13,12 @@ my $paint = "term";
 
 if ($ARGV[0] eq "-e")
 {  shift @ARGV; $encoding = $ARGV[0]; shift @ARGV; }
+my $encoding_last = $encoding;
 
 ######################################################################
 
 # Enable unicode input for search ?
-my $unicode_mode = 1;
+my $search_mode = "unicode";
 
 
 # Terminal stuff
@@ -85,7 +86,7 @@ sub to_multibyte
     {
 	if (ord($a[$i]) < 32)
 	{  $a[$i] = "."; }
-    }	    
+    }
 
     return join("", @a);
 }
@@ -298,19 +299,41 @@ sub check_down
     }
 }
 
+sub search_decode
+{
+    my ($s) = @_;
+    
+    if ($search_mode eq "unicode")
+    {  return  Encode::decode($encoding, $s);  }
+    if ($search_mode eq "hex")
+    {  return  unpack("H*", $s);  }
+    return $s;
+}
+
+sub search_encode
+{
+    my ($s) = @_;
+    
+    if ($search_mode eq "unicode")
+    {  return  Encode::encode($encoding, $s);  }
+    if ($search_mode eq "hex")
+    {  return  pack("H*", $s);  }
+    return $s;
+}
+
 sub sequence_index
 {   
     my ($s) = @_;
     my $b;
     
     if (found_sequence($s) == 2)
-    {  $b = Encode::decode($encoding, substr($bytes, 1));    }
+    {  $b = search_decode(substr($bytes, 1));    }
     else
-    {  $b = ($unicode_mode ? Encode::decode($encoding, $bytes) : $bytes);    }
+    {  $b = search_decode($bytes);    }
     
     my $i = index($b, $s, 0);
-    if ($unicode_mode && $i != -1)  # Find offset in bytes
-    {  $i = length(Encode::encode($encoding, substr($b, 0, $i))) + (found_sequence($s) == 2);  }
+    if ($search_mode ne "ascii" && $i != -1)  # Find offset in bytes
+    {  $i = length(search_encode(substr($b, 0, $i))) + (found_sequence($s) == 2);  }
     return $i;
 }
 
@@ -319,16 +342,18 @@ sub found_sequence
 {   
     my ($s) = @_;
     
-    if (!unicode_mode)
+    if ($search_mode eq "ascii")
     {  return ($bytes =~ m/$s/); }
+
+    if ($search_mode eq "hex")
+    {  return (search_decode($bytes) =~ m/$s/);   }
     
-    my $b = Encode::decode($encoding, $bytes);
-    if ($b =~ m/$s/)
+    # $search_mode: "unicode"
+    if (search_decode($bytes) =~ m/$s/)
     {  return 1;  }
 
     # Try shifting by one byte (needed for utf-16)
-    my $b = Encode::decode($encoding, substr($bytes, 1));
-    if ($b =~ m/$s/)
+    if (search_decode(substr($bytes, 1)) =~ m/$s/)
     {  return 2;  }
 
     return 0;
@@ -438,23 +463,28 @@ while (1)
 	$top = $cur - $lines * $width + 1;
 	read_file();
     }
+
+    if ($key eq "a")
+    {  $encoding = ($encoding eq "ascii" ? $encoding_last : "ascii");  read_file();  }
     if ($key eq "")
-    {
-	print "$cls";
-	$top = $cur - $lines/2 * $width;
-	if ($top < 0) { $top = 0; }
-	read_file();
-    }
-    
-    if ($key eq "U")
-    {  $unicode_mode = !$unicode_mode; printf("Unicode mode: %i\n", $unicode_mode); }
-    
+    {  $top = $cur - $lines/2 * $width; if ($top < 0) { $top = 0; }  read_file(); print "$cls";   }
+
+    # Search stuff    
     if ($key eq "/")
-    {  search_forward(($unicode_mode ? read_line_unicode("/") : read_line("/")));  }
+    { 
+	my $prompt = ($search_mode eq "hex" ? "/ 0x" : "/");
+	search_forward(($search_mode eq "unicode" ? read_line_unicode($prompt) : read_line($prompt)));  
+    }
     if ($key eq "n")
     {  search_forward($last_search);  }
 
+    if ($key eq "U")
+    {  $search_mode = ($search_mode eq "unicode" ? "ascii" : "unicode");
+       $status = sprintf("Search mode: %s\n", $search_mode);    }
+    if ($key eq "X")
+    {  $search_mode = "hex";  $status = sprintf("Search mode: %s\n", $search_mode);  }
 
+    # Write operations
     if ($key eq "w")
     {  write_string(read_line("write: "));   }
 
