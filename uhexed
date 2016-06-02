@@ -59,6 +59,8 @@ my $end  =   "\e[0m";
 my $inv_video = "\e[7m";
 my $cls = "\e[2J";
 my $cursor_top = "\e[0;0H";	# ESC[y;xH  move cursor to row y, col x
+my $hide_cursor = "\e[?25l";
+my $show_cursor = "\e[?25h";
 
 
 binmode STDOUT, ":utf8";
@@ -185,7 +187,7 @@ $lines = 25;
 sub print_page
 {    
     if ($paint eq "term")
-    {	print "$cursor_top";   }
+    {	print "$cursor_top$hide_cursor";   }
 
     # Status line
     clear_line();
@@ -228,7 +230,7 @@ sub print_page
 	printf("$end  \n");
     }
 
-    print "$bl";
+    print "$show_cursor$bl";
     $clear_screen = 0;
 }
 
