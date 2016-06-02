@@ -2,16 +2,6 @@
 use Encode qw(decode encode);
 use HotKey;
 
-my $end  =   "\e[0m";
-my $inv_video = "\e[7m";
-
-
-binmode STDOUT, ":utf8";
-my $file = $ARGV[0];
-
-open(FILE, "+<", $file) || die "couldn't open $file";
-#binmode FILE, ':binary';
-
 # Enable unicode input for search ?
 my $unicode_mode = 1;
 
@@ -19,11 +9,35 @@ my $encoding = "cp932";   # Windows codepage 932 - Japanese (Shift-JIS)
 #my $encoding = "utf-8";
 #my $encoding = "utf-16";
 
+#my $paint = "dumb";       # debugging
+my $paint = "term";
+
+# Terminal stuff
+my $tcols = `tput cols`;
+my $tlines = `tput lines`;
+my $blank = join("", map { " " } (1..$tcols) );
+my $bl = $blank . "\n";		# blank line
+
+my $end  =   "\e[0m";
+my $inv_video = "\e[7m";
+my $cls = "\e[2J";
+
+
+
+binmode STDOUT, ":utf8";
+my $file = $ARGV[0];
+
+# TODO read-only mode
+open(FILE, "+<", $file) || die "couldn't open $file";
+
+
 # Buffer size
 my $bsize = 8192;
 my $bytes = "";
 my $top = 0;
 my $cur = 0;
+
+my $status = "";
 
 seek(FILE, 0, 2);
 my $file_size = tell(FILE);
@@ -125,8 +139,21 @@ sub print_chars_ascii
 $width = 28;
 $lines = 25;
 sub print_page
-{
-    printf("\n\n\n\n\n\n");
+{    
+    if ($paint eq "term")
+    {
+	# ESC[y;xH  move cursor to row y, col x
+	printf("\e[0;0H");
+    }
+
+    # Status line
+    printf("%s", ($status ne "" ? $status : "$bl"));
+    $status = "";
+
+    if ($paint eq "dumb")
+    {   printf("\n\n\n\n\n\n");   }
+    else
+    {  print "$bl$bl$bl$bl";      }
 
     for (my $i = 0; $i < $lines; $i++)
     {
@@ -146,8 +173,16 @@ sub print_page
 	print_chars_jap($i);
 	#print_chars_ascii($i);
 
-	printf("\n");
+	printf("  \n");
     }
+
+    if ($paint eq "term")
+    {   print "$bl"; }
+}
+
+sub clear_line
+{
+    print "\r$blank\r";
 }
 
 sub read_line_unicode
@@ -159,7 +194,7 @@ sub read_line_unicode
     {
 	my $key = readkey();
 	if ($key eq "\n")
-	{  return Encode::decode("utf-8", $s);  }
+	{  clear_line(); return Encode::decode("utf-8", $s);  }
 	if (ord($key) == 0x7f)  # Backspace
 	{ 
 	   my $s2 = $s;  $s2 =~ s/./ /g;
@@ -183,7 +218,7 @@ sub read_line
     {
 	my $key = readkey();
 	if ($key eq "\n")
-	{  return $s;	}
+	{  clear_line(); return $s;	}
 	if (ord($key) == 0x7f)  # Backspace
 	{ 
 	   my $s2 = $s;  $s2 =~ s/./ /g;
@@ -231,8 +266,6 @@ sub read_key
     return $s;
 }
 
-print_page();
-
 sub check_up
 {
      if ($cur < 0) { $cur = 0; }
@@ -258,7 +291,7 @@ my $last_search = "";
 sub search_forward
 {
     my ($s) = @_;
-    printf("\nsearching for '%s'\n", $s);
+    #printf("\nsearching for '%s'\n", $s);
     if ($s eq "")
     { return; }
 
@@ -276,7 +309,7 @@ sub search_forward
 	$top += $bsize; 
 	if (!read_file())      # Not found, go back to starting point
 	{  
-	    printf("Not found\n");
+	    $status = "Not found\n";
 	    $top = $old_top; read_file(); return; 
 	}
 
@@ -290,7 +323,7 @@ sub search_forward
     { printf("Eeek bug, index says not found\n"); }
     else
     {
-	printf("Found at 0x%08x\n", $top + $i);
+	$status = sprintf("Found at 0x%08x\n", $top + $i);
 	$cur = $top + $i;
 	if ($cur > $top + $lines * $width) 
 	{
@@ -319,6 +352,15 @@ sub change_hex
     my $c = chr($s);
     write_string($c);
 }
+
+#####################################################################
+
+
+# Clear screen
+if ($paint eq "term") { print($cls); }
+
+print_page();
+
 
 while (1)
 {
