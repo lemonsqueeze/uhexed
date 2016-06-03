@@ -116,74 +116,38 @@ sub to_multibyte
     return $s;
 }
 
-sub split_dummy
+# Dumb and slow but should handle pretty much any encoding
+sub split_multibyte
 {
     my ($line) = @_;    
-    my $off = $line;
     my $split = $cur - ($top + $line);
     my $len = 1;
 
-    my $s1 = to_multibyte(substr($bytes, $off, $split));	$off += $split;
-    my $s2 = to_multibyte(substr($bytes, $off, $len));          $off += $len;    
-    my $s3 = to_multibyte(substr($bytes, $off, max($width - $len - $split, 0)));
+    my $s = to_multibyte(substr($bytes, $line, $width));    
+    my ($s1, $s2, $s3);    
+    
+    while ($len < 5)  # Find character beginning ...
+    {    
+	$s1 = to_multibyte(substr($bytes, $line, $split));
+	if (index($s, $s1) != 0)	# Bad offset
+	{ $split--; $len++; next;  }
+
+	$sn = to_multibyte(substr($bytes, $line, $split - 1));
+	if (length($s1) == length($sn)) # Eating up something ?
+	{ $split--; $len++; next;  }
+	last;
+    }
+    
+    while ($len < 5)		# Length now ...
+    {
+	my $off = $line + $split;
+	$s2 = to_multibyte(substr($bytes, $off, $len));          $off += $len;    
+	$s3 = to_multibyte(substr($bytes, $off, max($width - $len - $split, 0)));
+	if ("$s1$s2$s3" ne $s)	{  $len++; next;  }
+	last;
+    }
     return ($s1, $s2, $s3);
 }
-
-sub split_utf16
-{
-    my ($line) = @_;
-    my $off = $line;
-    my $split = $cur - ($top + $line);
-    my $len = 1;
-    
-    # Don't split multi-byte characters !
-    if (length(to_multibyte(substr($bytes, $line, $split))) == 
-	length(to_multibyte(substr($bytes, $line, $split + 1))))
-    {  $len++;   }		# multi-byte char at cursor
-
-    if (($split) &&
-	length(to_multibyte(substr($bytes, $line, $split))) == 
-	length(to_multibyte(substr($bytes, $line, $split - 1))))
-    {  $len++; $split--;  }	# multi-byte char starts before cursor
-    
-    my $s1 = to_multibyte(substr($bytes, $off, $split));	$off += $split;
-    my $s2 = to_multibyte(substr($bytes, $off, $len));          $off += $len;
-    my $s3 = to_multibyte(substr($bytes, $off, $width - $len - $split));
-    return ($s1, $s2, $s3);
-}
-
-sub byte_at
-{
-    my ($off) = @_;
-    return ord(substr($bytes, $off, 1));
-}
-
-sub split_utf8
-{
-    my ($line) = @_;
-    my $off = $line;
-    my $split = $cur - ($top + $line);
-    my $len = 1;
-
-    # Continuation byte ?
-    while ($split && ((byte_at($off + $split) & 0xc0) == 0x80))
-    { $split--;  }
-
-    my $c = byte_at($off + $split);    # Leading byte ? Find length
-    if (($c & 0xc0) == 0xc0)
-    { $len = 1 + (($c & 0x30) >> 4); }
-    
-    my $s1 = to_multibyte(substr($bytes, $off, $split));	$off += $split;
-    my $s2 = to_multibyte(substr($bytes, $off, $len));          $off += $len;    
-    my $s3 = to_multibyte(substr($bytes, $off, max($width - $len - $split, 0)));
-    return ($s1, $s2, $s3);
-}
-
-
-my $split_multibyte = \&split_utf16;
-$split_multibyte = \&split_utf8   if ($encoding eq "utf-8");
-#$split_multibyte = \&split_utf16  if ($encoding =~ m/utf-16/i);
-#$split_multibyte = \&split_dummy;
 
 sub print_chars_multibyte
 {
@@ -193,7 +157,7 @@ sub print_chars_multibyte
     my $line = $i * $width;
     if ($top + $line <= $cur && $cur < $top + $line + $width)	# Highlight character at cursor
     {
-	my ($s1, $s2, $s3) = &$split_multibyte($line);
+	my ($s1, $s2, $s3) = split_multibyte($line);
 	print "$s1$inv_video$s2$end$col$s3";
 	
 	if ($matrix_mode)
