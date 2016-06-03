@@ -147,20 +147,18 @@ sub print_chars_multibyte
 	{  $len++; $split--;  }	# multi-byte char starts before cursor
 	
 	my $s = to_multibyte(substr($bytes, $off, $split));	    
-	printf("%s%s", $s, $inv_video);
+	print "$s$inv_video";
 	$off += $split;
 	
 	my $s = to_multibyte(substr($bytes, $off, $len));
-	printf("%s$end$col", $s);
+	print "$s$end$col";
 	$off += $len;
 
-	my $s = to_multibyte(substr($bytes, $off, $width - $len - $split));
-	printf("%s", $s);
+	print to_multibyte(substr($bytes, $off, $width - $len - $split));
     }
     else 
     { 
-	my $s = to_multibyte(substr($bytes, $line, $width));
-	printf("%s", $s);
+	print to_multibyte(substr($bytes, $line, $width));
     }
 }
 
@@ -171,10 +169,9 @@ sub print_chars_ascii
     for (my $j = 0; $j < $width; $j++)
     {
 	my $p = $i*$width + $j;
-	print("$inv_video") if ($top + $p == $cur);
-	printf("%s", to_ascii(substr($bytes, $p, 1)));
-	print("$end$col") if ($top + $p == $cur);
-	#printf(" ") if (($j+1) % 4 == 0);		
+	print "$inv_video" if ($top + $p == $cur);
+	print to_ascii(substr($bytes, $p, 1));
+	print "$end$col" if ($top + $p == $cur);
     }    
 }
 
@@ -215,7 +212,7 @@ sub print_page
 	    print("$inv_video") if ($top + $p == $cur);
 	    printf("%02x", ord(substr($bytes, $p, 1)) );
 	    print("$end$col") if ($top + $p == $cur);
-	    printf(" ") if (($j+1) % 4 == 0);		
+	    print(" ") if (($j+1) % 4 == 0);
 	}
 
 	printf("    ");
@@ -224,7 +221,7 @@ sub print_page
 	else
 	{   print_chars_multibyte($i, $col);    }
 	
-	printf("$end  \n");
+	print("$end  \n");
     }
 
     print "$show_cursor$bl";
