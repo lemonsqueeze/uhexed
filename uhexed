@@ -296,13 +296,13 @@ sub print_page
 sub read_line_unicode
 {
     my ($prompt) = @_;
-    print "$prompt";  STDOUT->flush();
+    print "$bgreen$prompt";  STDOUT->flush();
     my $s = "";
     while (1)
     {
 	my $key = readkey();
 	if ($key eq "\n")
-	{  clear_line(); return Encode::decode("utf-8", $s);  }
+	{  print "$end"; clear_line(); return Encode::decode("utf-8", $s);  }
 	if (ord($key) == 0x7f)  # Backspace
 	{ 
 	   my $s2 = $s;  $s2 =~ s/./ /g;
@@ -320,13 +320,13 @@ sub read_line_unicode
 sub read_line
 {
     my ($prompt) = @_;
-    print "$prompt";  STDOUT->flush();
+    print "$bgreen$prompt";  STDOUT->flush();
     my $s = "";
     while (1)
     {
 	my $key = readkey();
 	if ($key eq "\n")
-	{  clear_line(); return $s;	}
+	{  print "$end"; clear_line(); return $s;	}
 	if (ord($key) == 0x7f)  # Backspace
 	{ 
 	   my $s2 = $s;  $s2 =~ s/./ /g;
@@ -632,8 +632,12 @@ while (1)
     # Search commands
     if ($key eq "/")
     { 
-	my $prompt = ($search_mode eq "hex" ? "/ 0x" : "/");
-	search_forward(($search_mode eq "unicode" ? read_line_unicode($prompt) : read_line($prompt)));  
+	my $s;
+	if ($search_mode eq "hex")
+	{   $s = read_line("/ 0x");   $s =~ s/ //g;   }
+	else
+	{   $s = ($search_mode eq "unicode" ? read_line_unicode("/") : read_line("/"));   }
+	search_forward($s);
     }
     if ($key eq "n")
     {  search_forward($last_search);  }
