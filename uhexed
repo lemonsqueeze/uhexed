@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 # uhexed
-# Simple multi-byte hex editor
+# unicode hex editor
 # http://github.com/lemonsqueeze/uhexed
 
 use Encode qw(decode encode);
@@ -36,13 +36,13 @@ my $encoding_last = $encoding;
 # Enable unicode input for search ?
 my $search_mode = "unicode";
 
-
 # Terminal stuff
 my $tcols = `tput cols`;
 my $tlines = `tput lines`;
 my $blank = join("", map { " " } (1..$tcols) );
 my $bl = $blank . "\n";		# blank line
 my $clear_screen = 0;
+my $matrix_mode = 0;
 
 my $bold =   "\e[40;37;1m";
 my $blue =   "\e[40;34m";
@@ -155,10 +155,28 @@ sub print_chars_multibyte
 	$off += $len;
 
 	print to_multibyte(substr($bytes, $off, $width - $len - $split));
+
+	if ($matrix_mode)
+	{
+	    my $s = to_multibyte(substr($bytes, $line, $width));
+	    my @t = split("", $s);
+	    for (my $i = 0; $i < @t; $i++)
+	    { my $highlight = (rand(5) < 1); }
+	}
+	return;
     }
-    else 
-    { 
-	print to_multibyte(substr($bytes, $line, $width));
+    
+    if (!$matrix_mode)
+    {   print to_multibyte(substr($bytes, $line, $width));  }
+    else
+    {
+	my $s = to_multibyte(substr($bytes, $line, $width));
+	my @t = split("", $s);
+	for (my $i = 0; $i < @t; $i++)
+	{  
+	    if (rand(5) < 1)  { print "$bgreen$t[$i]$end$green"; }
+	    else	          { print $t[$i]; }
+	}
     }
 }
 
@@ -169,9 +187,12 @@ sub print_chars_ascii
     for (my $j = 0; $j < $width; $j++)
     {
 	my $p = $i*$width + $j;
+	my $highlight = $matrix_mode && (rand(5) < 1);
+	if ($highlight)  { print "$bgreen"; }
 	print "$inv_video" if ($top + $p == $cur);
 	print to_ascii(substr($bytes, $p, 1));
 	print "$end$col" if ($top + $p == $cur);
+	if ($highlight)  { print "$end$col"; }
     }    
 }
 
@@ -198,6 +219,8 @@ sub print_page
     printf("${bgreen}0x%08x  %-7s %*s($encoding)${end}\n", $cur, sprintf("(%i%%)", $top * 100 / $file_size), 
 	   $width * 2 + $width / 4 - 4, "");
 
+    if ($matrix_mode) {  srand($top);  }
+    
     for (my $i = 0; $i < $lines; $i++)
     {
 	if ($clear_screen) { clear_line(); }
@@ -209,9 +232,12 @@ sub print_page
 	for (my $j = 0; $j < $width; $j++)
 	{
 	    my $p = $i*$width + $j;
+	    my $highlight = $matrix_mode && (rand(5) < 1) && !$current_line;
+	    if ($highlight)  { print "$bgreen"; }
 	    print("$inv_video") if ($top + $p == $cur);
 	    printf("%02x", ord(substr($bytes, $p, 1)) );
 	    print("$end$col") if ($top + $p == $cur);
+	    if ($highlight)  { print "$end$col"; }
 	    print(" ") if (($j+1) % 4 == 0);
 	}
 
@@ -489,7 +515,8 @@ sub help
     print "\n";
     print "Display:\n";
     print "  a                   Toggle ascii/multibyte display\n";
-    print "  C-l                 Center on current position\n";
+    print "  m                   Matrix mode\n";
+    print "  C-l                 Refresh / Center on current position\n";
     print "\n";
     print "Searching:\n";
     print "  /                   Forward search\n";
@@ -558,6 +585,8 @@ while (1)
     # Display commands
     if ($key eq "a")
     {  $encoding = ($encoding eq "ascii" ? $encoding_last : "ascii");  read_file();  }
+    if ($key eq "m")
+    {  $matrix_mode = !$matrix_mode;  }
     if ($key eq "")
     {  center_on();  }
 

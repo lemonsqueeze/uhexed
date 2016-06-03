@@ -1,13 +1,13 @@
 uhexed
 ======
 
-Simple terminal multi-byte hex editor / hexdump.
+Simple terminal unicode hex editor / hexdump.
 
 Usage: uhexed [-e encoding] binary_file
 
 Type 'h' for key help
 
-Encoding can be pretty much any encoding that perl supports.
+Encoding can be pretty much anything that perl supports.
 For BOM-type encodings you must specify byte order explicitly (so utf-16le or utf-16be for utf-16).
 
 Tested so far:
@@ -17,7 +17,10 @@ Tested so far:
 - utf-8
 - iso-8859-1
 
+Matrix mode screenshot:
+
 ![Screenshot](https://raw.githubusercontent.com/lemonsqueeze/uhexed/master/screenshot.png)
+
 
 Bugs
 ----
