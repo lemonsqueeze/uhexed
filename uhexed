@@ -477,7 +477,7 @@ sub write_string
 sub change_hex
 {
     my $s = read_line("Hex: 0x");
-    my $c = chr($s);
+    my $c = chr(eval("0x$s"));
     write_string($c);
 }
 
