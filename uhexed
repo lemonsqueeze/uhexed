@@ -489,6 +489,17 @@ sub goto_address
     $cur = $top = $s; read_file();
 }
 
+sub skip_forward
+{
+    my $s = read_line("Skip forward: ");
+    if ($s eq "") { return; }
+    $s = eval($s);
+    $cur += $s; check_down(); check_up();
+    if ($cur < 0 ||
+	$cur >= $top + $lines * $width)
+    {  $top = $cur; read_file();  }
+}
+
 my $prev_center_on;
 sub center_on
 {
@@ -515,6 +526,7 @@ sub help
     print "  C-pgup C-pgdn       Move up/down 1% of file\n";
     print "  <  >                Move to beginning/end\n";    
     print "  g                   Goto address\n";
+    print "  f s                 Skip forward\n";
     print "\n";
     print "Display:\n";
     print "  a                   Toggle ascii/multibyte display\n";
@@ -584,6 +596,9 @@ while (1)
 
     if ($key eq "g")
     {  goto_address(); }
+
+    if ($key eq "s" || $key eq "f")
+    {  skip_forward(); }
 
     # Display commands
     if ($key eq "a")
