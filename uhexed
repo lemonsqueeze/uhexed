@@ -3,9 +3,13 @@
 # unicode hex editor
 # http://github.com/lemonsqueeze/uhexed
 
+use FindBin;
 use Encode qw(decode encode);
 use List::Util qw(max min);
+
+use lib "$FindBin::Bin"; # So modules in script directory can be loaded
 use HotKey;
+
 
 # Default encoding
 my $encoding = "utf-8";
